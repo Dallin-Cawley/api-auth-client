@@ -13,6 +13,8 @@ go get github.com/Dallin-Cawley/api-auth-client
 To use this library, you first need to initialize the configuration with the base URL of your `api-auth` server. You can also optionally provide a custom logger.
 
 ```go
+package main
+
 import (
     "github.com/Dallin-Cawley/api-auth-client"
 )
@@ -27,6 +29,8 @@ func init() {
 By default, the library uses a JSON handler logging to `os.Stdout` at `Debug` level. You can override this:
 
 ```go
+package main
+
 import (
     "log/slog"
     "os"
@@ -43,6 +47,8 @@ auth.SetLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))
 To create a new token, use the `GetToken` method with the appropriate credentials.
 
 ```go
+package main
+
 import (
     "fmt"
     "github.com/Dallin-Cawley/api-auth-client"
@@ -68,6 +74,8 @@ func main() {
 To verify an existing token, use the `VerifyToken` method.
 
 ```go
+package main
+
 import (
     "fmt"
     "github.com/Dallin-Cawley/api-auth-client"
