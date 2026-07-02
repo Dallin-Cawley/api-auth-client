@@ -95,3 +95,70 @@ func validate(accessToken string) {
 }
 ```
 
+### Request Decoration
+
+For automatic token management and request decoration, use the `ClientCredentialsDecorator`. It handles token caching and automatic refreshing when the token expires. The decorator is thread-safe and can be shared across multiple clients or goroutines.
+
+```go
+package main
+
+import (
+    "net/http"
+    "github.com/Dallin-Cawley/api-auth-client"
+)
+
+func main() {
+    decorator := auth.NewClientCredentialsDecorator("my-client-id", "my-client-secret")
+
+    req, _ := http.NewRequest("GET", "https://api.your-service.com/data", nil)
+    
+    // Decorate the request with a Bearer token
+    if err := decorator.Decorate(req); err != nil {
+        panic(err)
+    }
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+    
+    // ...
+}
+```
+
+### Auth Middleware
+
+The library also provides a standard library-compatible middleware for authenticating incoming HTTP requests.
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "github.com/Dallin-Cawley/api-auth-client"
+)
+
+func main() {
+    mux := http.NewServeMux()
+
+    // Protected endpoint
+    mux.Handle("GET /protected", auth.AuthMiddleware(http.HandlerFunc(protectedHandler)))
+
+    http.ListenAndServe(":8080", mux)
+}
+
+func protectedHandler(w http.ResponseWriter, r *http.Request) {
+    // Retrieve token information from the context
+    tokenInfo, ok := auth.FromContext(r.Context())
+    if !ok {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+
+    fmt.Fprintf(w, "Hello, %s!", tokenInfo.Subject)
+}
+```
+
