@@ -46,7 +46,8 @@ func (testSuite *DecoratorTestSuite) TestClientCredentialsDecorator_Decorate() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	decorator := &ClientCredentialsDecorator{
 		clientID:     "client-id",
@@ -90,7 +91,8 @@ func (testSuite *DecoratorTestSuite) TestClientCredentialsDecorator_ConcurrentDe
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	signer := &ClientCredentialsDecorator{
 		clientID:     "client-id",
@@ -134,7 +136,8 @@ func (testSuite *DecoratorTestSuite) TestClientCredentialsDecorator_Decorate_Ref
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	signer := &ClientCredentialsDecorator{
 		clientID:     "client-id",
@@ -155,7 +158,8 @@ func (testSuite *DecoratorTestSuite) TestClientCredentialsDecorator_Decorate_Par
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	signer := &ClientCredentialsDecorator{
 		clientID:     "client-id",
@@ -176,7 +180,8 @@ func (testSuite *DecoratorTestSuite) TestClientCredentialsDecorator_RefreshToken
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	signer := &ClientCredentialsDecorator{
 		clientID:     "client-id",

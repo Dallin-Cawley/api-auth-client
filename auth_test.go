@@ -9,7 +9,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Dallin-Cawley/public-api-auth/input"
 	"github.com/Dallin-Cawley/public-api-auth/output"
 	"github.com/stretchr/testify/suite"
 )
@@ -18,19 +17,51 @@ type AuthTestSuite struct {
 	suite.Suite
 }
 
-func (testSuite *AuthTestSuite) TestSetConfig() {
+func (testSuite *AuthTestSuite) TestInit() {
 	baseURL := "https://api.example.com"
-	SetConfig(baseURL)
+	creds := NewCredentials("id", "secret")
+	loader := &mockLoader{creds: creds}
+	err := Init(WithBaseURL(baseURL), WithLoader(loader))
 
+	testSuite.NoError(err)
 	testSuite.NotNil(theConfig)
 	testSuite.Equal(baseURL, theConfig.BaseURL)
+	testSuite.Equal(creds, theConfig.Credentials)
 }
 
-func (testSuite *AuthTestSuite) TestSetLogger() {
+func (testSuite *AuthTestSuite) TestInit_WithLogger() {
 	newLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	SetLogger(newLogger)
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	err := Init(WithBaseURL("https://api.example.com"), WithLoader(loader), WithLogger(newLogger))
 
-	testSuite.Equal(newLogger, logger)
+	testSuite.NoError(err)
+	testSuite.Equal(newLogger, theConfig.Logger)
+}
+
+func (testSuite *AuthTestSuite) TestInit_MissingBaseURL() {
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	err := Init(WithLoader(loader))
+
+	var missingConfigErr *ErrMissingRequiredConfig
+	testSuite.ErrorAs(err, &missingConfigErr)
+	testSuite.Equal("BaseURL", missingConfigErr.Field)
+	testSuite.Equal("missing required configuration: BaseURL", err.Error())
+}
+
+func (testSuite *AuthTestSuite) TestInit_MissingLoader() {
+	err := Init(WithBaseURL("https://api.example.com"))
+
+	var missingConfigErr *ErrMissingRequiredConfig
+	testSuite.ErrorAs(err, &missingConfigErr)
+	testSuite.Equal("Loader", missingConfigErr.Field)
+}
+
+func (testSuite *AuthTestSuite) TestInit_LoadFailure() {
+	baseURL := "https://api.example.com"
+	loader := &mockLoader{err: fmt.Errorf("load error")}
+	err := Init(WithBaseURL(baseURL), WithLoader(loader))
+
+	testSuite.ErrorContains(err, "failed to load credentials: load error")
 }
 
 func (testSuite *AuthTestSuite) TestGetToken_Success() {
@@ -50,11 +81,10 @@ func (testSuite *AuthTestSuite) TestGetToken_Success() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
-	inputBody := input.NewCreateTokenInputBody(new("client-id"), new("client-secret"))
-
-	resp, err := GetToken(inputBody)
+	resp, err := GetToken()
 
 	testSuite.NoError(err)
 	testSuite.Equal(expectedResponse.AccessToken, resp.AccessToken)
@@ -69,21 +99,19 @@ func (testSuite *AuthTestSuite) TestGetToken_Failure() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
-	inputBody := input.NewCreateTokenInputBody(new("client-id"), new("client-secret"))
-
-	_, err := GetToken(inputBody)
+	_, err := GetToken()
 
 	testSuite.ErrorContains(err, "http request failed with status code")
 }
 
 func (testSuite *AuthTestSuite) TestGetToken_RequestFailure() {
-	SetConfig(" http://invalid") // Leading space makes it invalid for NewRequest
+	loader := &mockLoader{creds: NewCredentials("client-id", "client-secret")}
+	_ = Init(WithBaseURL(" http://invalid"), WithLoader(loader)) // Leading space makes it invalid for NewRequest
 
-	inputBody := input.NewCreateTokenInputBody(new("client-id"), new("client-secret"))
-
-	_, err := GetToken(inputBody)
+	_, err := GetToken()
 
 	testSuite.ErrorContains(err, "failed to create request")
 }
@@ -107,11 +135,10 @@ func (testSuite *AuthTestSuite) TestVerifyToken_Success() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
-	inputBody := input.NewValidateTokenInputBody("test-token")
-
-	resp, err := VerifyToken(inputBody)
+	resp, err := VerifyToken("test-token")
 
 	testSuite.NoError(err)
 	testSuite.Equal(expectedResponse.Subject, resp.Subject)
@@ -125,11 +152,10 @@ func (testSuite *AuthTestSuite) TestVerifyToken_Failure() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
-	inputBody := input.NewValidateTokenInputBody("invalid-token")
-
-	_, err := VerifyToken(inputBody)
+	_, err := VerifyToken("invalid-token")
 
 	testSuite.ErrorContains(err, "http request failed with status code")
 }
@@ -137,6 +163,38 @@ func (testSuite *AuthTestSuite) TestVerifyToken_Failure() {
 func (testSuite *AuthTestSuite) TestDo_MarshalFailure() {
 	_, err := do[any]("path", "METHOD", make(chan int))
 	testSuite.ErrorContains(err, "failed to marshal request body")
+}
+
+type mockLoader struct {
+	creds *Credentials
+	err   error
+}
+
+func (m *mockLoader) Load() (*Credentials, error) {
+	return m.creds, m.err
+}
+
+func (testSuite *AuthTestSuite) TestLoadCredentials_Success() {
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	_ = Init(WithBaseURL("http://api.example.com"), WithLoader(loader))
+	expectedCreds := NewCredentials("new-id", "new-secret")
+	newLoader := &mockLoader{creds: expectedCreds}
+
+	err := LoadCredentials(newLoader)
+
+	testSuite.NoError(err)
+	testSuite.Equal(expectedCreds, theConfig.Credentials)
+}
+
+func (testSuite *AuthTestSuite) TestLoadCredentials_Failure() {
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	_ = Init(WithBaseURL("http://api.example.com"), WithLoader(loader))
+	expectedErr := fmt.Errorf("load error")
+	newLoader := &mockLoader{err: expectedErr}
+
+	err := LoadCredentials(newLoader)
+
+	testSuite.ErrorContains(err, "failed to load credentials: load error")
 }
 
 func Test_RunAuthTestSuite(t *testing.T) {

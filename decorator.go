@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/Dallin-Cawley/public-api-auth/input"
 )
 
 // Decorator is an interface that defines the Decorate method for adding authorization to an HTTP request.
@@ -68,8 +66,7 @@ func (decorator *ClientCredentialsDecorator) refreshToken() error {
 		return nil
 	}
 
-	inputBody := input.NewCreateTokenInputBody(&decorator.clientID, &decorator.clientSecret)
-	resp, err := GetToken(inputBody)
+	resp, err := GetToken()
 	if err != nil {
 		return fmt.Errorf("failed to get token: %w", err)
 	}

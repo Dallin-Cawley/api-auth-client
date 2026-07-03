@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Dallin-Cawley/public-api-auth/input"
 	"github.com/Dallin-Cawley/public-api-auth/output"
 )
 
@@ -19,9 +18,9 @@ func FromContext(ctx context.Context) (*output.ValidateOutputBody, bool) {
 	return val, ok
 }
 
-// AuthMiddleware is a middleware that authenticates incoming requests using a Bearer token.
+// Middleware is a middleware that authenticates incoming requests using a Bearer token.
 // It validates the token against the api-auth server using VerifyToken.
-func AuthMiddleware(next http.Handler) http.Handler {
+func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
@@ -37,8 +36,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		token := parts[1]
 
-		inputBody := input.NewValidateTokenInputBody(token)
-		tokenInfo, err := VerifyToken(inputBody)
+		tokenInfo, err := VerifyToken(token)
 		if err != nil {
 			http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 			return

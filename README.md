@@ -10,7 +10,7 @@ go get github.com/Dallin-Cawley/api-auth-client
 
 ## Initialization
 
-To use this library, you first need to initialize the configuration with the base URL of your `api-auth` server. You can also optionally provide a custom logger.
+To use this library, you first need to initialize the configuration with the base URL of your `api-auth` server and a credentials loader. You can also optionally provide a custom logger.
 
 ```go
 package main
@@ -20,7 +20,13 @@ import (
 )
 
 func init() {
-    auth.SetConfig("https://auth.your-server.com")
+    err := auth.Init(
+        auth.WithBaseURL("https://auth.your-server.com"),
+        auth.WithLoader(auth.NewEnvLoader()),
+    )
+    if err != nil {
+        panic(err)
+    }
 }
 ```
 
@@ -37,14 +43,18 @@ import (
     "github.com/Dallin-Cawley/api-auth-client"
 )
 
-auth.SetLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+err := auth.Init(
+    auth.WithBaseURL("https://auth.your-server.com"),
+    auth.WithLoader(auth.NewFileLoader(auth.WithFilePath("credentials.json"))),
+    auth.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil))),
+)
 ```
 
 ## Usage
 
 ### Token Creation
 
-To create a new token, use the `GetToken` method with the appropriate credentials.
+To create a new token, use the `GetToken` method. The credentials must have been loaded during initialization.
 
 ```go
 package main
@@ -52,15 +62,10 @@ package main
 import (
     "fmt"
     "github.com/Dallin-Cawley/api-auth-client"
-    "github.com/Dallin-Cawley/public-api-auth/input"
 )
 
 func main() {
-    clientID := "my-client-id"
-    clientSecret := "my-client-secret"
-    inputBody := input.NewCreateTokenInputBody(&clientID, &clientSecret)
-
-    token, err := auth.GetToken(inputBody)
+    token, err := auth.GetToken()
     if err != nil {
         panic(err)
     }
@@ -79,13 +84,10 @@ package main
 import (
     "fmt"
     "github.com/Dallin-Cawley/api-auth-client"
-    "github.com/Dallin-Cawley/public-api-auth/input"
 )
 
 func validate(accessToken string) {
-    inputBody := input.NewValidateTokenInputBody(accessToken)
-
-    result, err := auth.VerifyToken(inputBody)
+    result, err := auth.VerifyToken(accessToken)
     if err != nil {
         fmt.Println("Token is invalid:", err)
         return
@@ -145,7 +147,7 @@ func main() {
     mux := http.NewServeMux()
 
     // Protected endpoint
-    mux.Handle("GET /protected", auth.AuthMiddleware(http.HandlerFunc(protectedHandler)))
+    mux.Handle("GET /protected", auth.Middleware(http.HandlerFunc(protectedHandler)))
 
     http.ListenAndServe(":8080", mux)
 }

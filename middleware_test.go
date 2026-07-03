@@ -25,7 +25,8 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_Success() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	// Next handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_Success() {
 	})
 
 	// Middleware
-	middleware := AuthMiddleware(nextHandler)
+	middleware := Middleware(nextHandler)
 
 	// Request
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(testSuite.T().Context())
@@ -56,7 +57,7 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_MissingHeader() {
 		testSuite.Fail("Next handler should not be called")
 	})
 
-	middleware := AuthMiddleware(nextHandler)
+	middleware := Middleware(nextHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(testSuite.T().Context())
 	rr := httptest.NewRecorder()
 
@@ -71,7 +72,7 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_InvalidFormat() {
 		testSuite.Fail("Next handler should not be called")
 	})
 
-	middleware := AuthMiddleware(nextHandler)
+	middleware := Middleware(nextHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(testSuite.T().Context())
 	req.Header.Set("Authorization", "InvalidFormat token")
 	rr := httptest.NewRecorder()
@@ -89,13 +90,14 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_InvalidToken() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		testSuite.Fail("Next handler should not be called")
 	})
 
-	middleware := AuthMiddleware(nextHandler)
+	middleware := Middleware(nextHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(testSuite.T().Context())
 	req.Header.Set("Authorization", "Bearer invalid-token")
 	rr := httptest.NewRecorder()
@@ -117,13 +119,14 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_LowercaseBearer() {
 	}))
 	defer server.Close()
 
-	SetConfig(server.URL)
+	loader := &mockLoader{creds: NewCredentials("id", "secret")}
+	_ = Init(WithBaseURL(server.URL), WithLoader(loader))
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := AuthMiddleware(nextHandler)
+	middleware := Middleware(nextHandler)
 	// Test lowercase
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(testSuite.T().Context())
 	req.Header.Set("Authorization", "bearer valid-token")
@@ -144,7 +147,7 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_InvalidFormat_EmptyToke
 		testSuite.Fail("Next handler should not be called")
 	})
 
-	middleware := AuthMiddleware(nextHandler)
+	middleware := Middleware(nextHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(testSuite.T().Context())
 	req.Header.Set("Authorization", "Bearer ")
 	rr := httptest.NewRecorder()
@@ -159,7 +162,7 @@ func (testSuite *MiddlewareTestSuite) TestAuthMiddleware_InvalidFormat_TooManyFi
 		testSuite.Fail("Next handler should not be called")
 	})
 
-	middleware := AuthMiddleware(nextHandler)
+	middleware := Middleware(nextHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(testSuite.T().Context())
 	req.Header.Set("Authorization", "Bearer token extra")
 	rr := httptest.NewRecorder()
